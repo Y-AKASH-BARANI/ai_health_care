@@ -51,7 +51,8 @@ function getRiskStyle(level: string) {
 }
 
 export default function Triage() {
-  const { displayName, age, gender, uid, triageResult, setTriageResult } =
+  const router = useRouter();
+  const { displayName, age, gender, uid, setTriageResult } =
     useUserStore();
 
   const [file, setFile] = useState<File | null>(null);
@@ -85,6 +86,7 @@ export default function Triage() {
       });
 
       setTriageResult(data);
+      router.push("/result");
 
       // Save to Firestore
       if (uid) {

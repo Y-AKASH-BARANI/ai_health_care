@@ -18,11 +18,11 @@ export default function Onboarding() {
     e.preventDefault();
     if (!age || !gender) return;
     setDemographics({ age, gender });
-    router.push("/triage");
+    router.push("/dashboard");
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black">
+    <div className="flex flex-1 items-center justify-center px-4 py-12">
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
