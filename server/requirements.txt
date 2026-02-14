@@ -5,3 +5,7 @@ pydantic
 python-dotenv
 google-generativeai
 pypdf
+numpy
+pandas
+scikit-learn
+joblib

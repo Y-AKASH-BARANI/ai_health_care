@@ -1,10 +1,59 @@
-import google.generativeai as genai
-import os
 import json
+import os
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+from dotenv import load_dotenv
+import google.generativeai as genai
 
-model = genai.GenerativeModel("gemini-1.5-flash")
+load_dotenv()
+
+_api_key = os.getenv("GEMINI_API_KEY")
+if not _api_key:
+    raise ValueError(
+        "GEMINI_API_KEY is not set. "
+        "Add it to server/.env or export it as an environment variable."
+    )
+
+genai.configure(api_key=_api_key)
+
+# ---------------------------------------------------------------------------
+# Dynamic Model Discovery
+# ---------------------------------------------------------------------------
+print("Checking available Gemini models...")
+available_models: list[str] = []
+try:
+    for m in genai.list_models():
+        if "generateContent" in m.supported_generation_methods:
+            available_models.append(m.name)
+
+    print(f"Available: {available_models}")
+except Exception as e:
+    print(f"Error listing models: {e}")
+
+_PRIORITY_MODELS = [
+    "models/gemini-1.5-flash",
+    "models/gemini-1.5-pro",
+    "models/gemini-pro",
+    "models/gemini-1.0-pro",
+]
+
+_selected: str | None = None
+for p in _PRIORITY_MODELS:
+    if p in available_models:
+        _selected = p
+        break
+
+if _selected is None:
+    for m in available_models:
+        if "gemini" in m:
+            _selected = m
+            break
+
+if _selected:
+    print(f"Selected Model: {_selected}")
+    model = genai.GenerativeModel(_selected)
+else:
+    print("No specific Gemini model found. Trying default 'gemini-1.5-flash'...")
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
 TRIAGE_PROMPT = """You are an AI medical triage assistant. Analyze the following patient information and medical report, then provide a triage assessment.
 

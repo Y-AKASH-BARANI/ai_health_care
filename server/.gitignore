@@ -55,3 +55,17 @@ tmpclaude-*
 # ---------- Uploaded files (if any) ----------
 uploads/
 temp/
+
+# ---------- ML Data & Model Artifacts ----------
+# Raw / processed datasets
+*.csv
+
+# Serialised model binaries
+*.pkl
+*.joblib
+*.h5
+*.onnx
+
+# Keep the empty data/ and models/ directories in Git
+!data/.gitkeep
+!models/.gitkeep

@@ -15,7 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(triage.router, tags=["triage"])
+app.include_router(triage.router, prefix="/api/triage", tags=["triage"])
 
 
 @app.get("/")
