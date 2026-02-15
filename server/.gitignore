@@ -69,3 +69,4 @@ temp/
 # Keep the empty data/ and models/ directories in Git
 !data/.gitkeep
 !models/.gitkeep
+serviceAccountKey.json

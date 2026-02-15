@@ -10,6 +10,14 @@ interface FileUploadProps {
   onError: (message: string) => void;
 }
 
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+];
+
 export default function FileUpload({
   file,
   onFileChange,
@@ -20,12 +28,12 @@ export default function FileUpload({
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0];
-    if (selected && selected.type === "application/pdf") {
+    if (selected && ACCEPTED_TYPES.includes(selected.type)) {
       onFileChange(selected);
       addMedicalFile({ fileName: selected.name });
       onError("");
     } else {
-      onError("Please select a valid PDF file.");
+      onError("Please select a valid file (PDF or image).");
       onFileChange(null);
     }
   }
@@ -42,12 +50,12 @@ export default function FileUpload({
           {file.name}
         </div>
       ) : (
-        <p className="text-sm text-zinc-400">Upload a PDF report (optional)</p>
+        <p className="text-sm text-zinc-400">Upload a PDF or image report (optional)</p>
       )}
       <input
         ref={fileInputRef}
         type="file"
-        accept="application/pdf"
+        accept="application/pdf,image/png,image/jpeg,image/webp,image/gif"
         onChange={handleChange}
         className="hidden"
       />

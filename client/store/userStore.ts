@@ -29,10 +29,35 @@ interface FinalRecommendation {
   urgency_score: number;
 }
 
+export interface VitalCheck {
+  name: string;
+  value: string;
+  status: "normal" | "warning" | "critical";
+  score: number;
+}
+
+export interface DepartmentInsight {
+  department_name: string;
+  wait_time_estimate: string;
+  immediate_action: string;
+  specialist_type: string;
+}
+
+export interface CarePlan {
+  care_instructions: string[];
+  dietary_recommendations: string[];
+  dietary_restrictions: string[];
+}
+
 export interface TriageResult {
   ml_prediction: MLPrediction | null;
   ai_explanation: AIExplanation;
   final_recommendation: FinalRecommendation;
+  risk_factors: string[];
+  vital_analysis: VitalCheck[];
+  dept_insights: DepartmentInsight;
+  care_plan: CarePlan;
+  confidence_score: number;
 }
 
 interface UserState {

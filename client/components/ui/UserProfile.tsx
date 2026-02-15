@@ -44,7 +44,10 @@ export default function UserProfile() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      setHistory([]);
+      return;
+    }
 
     const q = query(
       collection(db, "users", uid, "history"),

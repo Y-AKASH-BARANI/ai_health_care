@@ -7,7 +7,7 @@ interface UserHealthCardProps {
     photoURL: string;
     age: string;
     gender: string;
-    riskLevel: "LOW" | "MEDIUM" | "HIGH";
+    riskLevel: string;
     lastTriageDate?: string;
     totalSessions?: number;
 }
@@ -43,6 +43,8 @@ export default function UserHealthCard({
             .toUpperCase()
             .slice(0, 2)
         : "U";
+
+    const riskKey = riskLevel.toUpperCase();
 
     return (
         <div className="w-full rounded-2xl border border-zinc-800/60 bg-slate-900/60 p-8 shadow-md backdrop-blur-sm">
@@ -84,10 +86,10 @@ export default function UserHealthCard({
                 </p>
                 <div className="flex items-center gap-2.5">
                     <span
-                        className={`inline-block h-2.5 w-2.5 rounded-full ${RISK_DOT[riskLevel]}`}
+                        className={`inline-block h-2.5 w-2.5 rounded-full ${RISK_DOT[riskKey] ?? "bg-zinc-500"}`}
                     />
                     <span className="text-sm font-medium text-zinc-300">
-                        {RISK_LABEL[riskLevel]}
+                        {RISK_LABEL[riskKey] ?? riskLevel}
                     </span>
                 </div>
             </div>

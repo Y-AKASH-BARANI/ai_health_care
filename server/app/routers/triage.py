@@ -1,10 +1,13 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 
-from app.ai_engine.gemini import analyze_report
+from app.ai_engine.gemini import analyze_document_image, analyze_document_text, analyze_report
+from app.firebase_setup import firestore_db
 from ml_core.inference import predictor
+from utils.text_processing import extract_text_from_pdf, is_image, is_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +32,7 @@ Patient Demographics:
 - Age: {age}
 - Gender: {gender}
 
-Vital Signs:
+Vital Signs (MANDATORY — weigh heavily in risk assessment):
 - Blood Pressure: {bp_systolic}/{bp_diastolic} mmHg
 - Heart Rate: {heart_rate} bpm
 - Temperature: {temperature} °C
@@ -37,11 +40,24 @@ Vital Signs:
 Reported Symptoms:
 {symptoms}
 
+Pre-existing Conditions:
+{conditions}
+
 {report_section}
 
 ML Model Prediction:
 - Risk Level : {risk_level} (confidence: {risk_confidence}%)
 - Department  : {department} (confidence: {dept_confidence}%)
+
+MANDATORY VITALS RULES (enforce strictly):
+- If Heart Rate > 120 bpm OR BP > 160/100 mmHg, risk_level MUST be "High" or "Critical".
+- If Temperature > 39.5 °C OR < 35.0 °C, risk_level MUST be at least "High".
+- If Heart Rate > 150 bpm OR BP > 180/120 mmHg, risk_level MUST be "Critical".
+
+CONFIDENCE SCORE RULES:
+- 30 if ONLY symptoms/history are provided (no vitals, no document).
+- 70 if symptoms AND all mandatory vitals (BP, HR, Temp) are provided.
+- 95 if symptoms AND vitals AND a medical document (EHR/EMR) are provided.
 
 Based on all of the above, provide a triage assessment.
 Explain why the predicted risk level and department are appropriate for these
@@ -53,7 +69,25 @@ Respond ONLY with valid JSON in this exact format (no markdown, no code fences):
   "summary": "A brief 1-2 sentence summary of the patient's condition.",
   "key_findings": ["finding 1", "finding 2", "finding 3"],
   "recommended_action": "What the patient should do next.",
-  "urgency_score": <number from 1 to 10>
+  "urgency_score": <number from 1 to 10>,
+  "risk_factors": ["specific risk factor 1", "specific risk factor 2", "specific risk factor 3"],
+  "vital_analysis": [
+    {{"name": "Blood Pressure", "value": "120/80 mmHg", "status": "normal" | "warning" | "critical", "score": <0-100>}},
+    {{"name": "Heart Rate", "value": "80 bpm", "status": "normal" | "warning" | "critical", "score": <0-100>}},
+    {{"name": "Temperature", "value": "37.0 °C", "status": "normal" | "warning" | "critical", "score": <0-100>}}
+  ],
+  "dept_insights": {{
+    "department_name": "The recommended department name",
+    "wait_time_estimate": "Estimated wait time e.g. '15-30 minutes'",
+    "immediate_action": "What to do right now before seeing a doctor",
+    "specialist_type": "Type of specialist e.g. 'Cardiologist'"
+  }},
+  "care_plan": {{
+    "care_instructions": ["3-4 specific care instructions based on the diagnosis"],
+    "dietary_recommendations": ["3-4 foods or drinks that help with recovery"],
+    "dietary_restrictions": ["3-4 foods or substances to strictly avoid"]
+  }},
+  "confidence_score": <integer 0-100 using the CONFIDENCE SCORE RULES above>
 }}
 """
 
@@ -97,22 +131,80 @@ async def _run_ml(
 async def analyze(
     age: int = Form(...),
     gender: str = Form(...),
-    symptoms: str = Form(...),
+    symptoms: str = Form(""),
+    conditions: str = Form(""),
     bp: str = Form(""),
     heart_rate: float = Form(0),
     temperature: float = Form(0),
     file: UploadFile | None = File(None),
+    uid: str = Form(""),
 ):
-    # ── 0. Parse vital signs with fallback defaults ───────────────────
-    bp_systolic, bp_diastolic = _parse_bp(bp) if bp.strip() else (_DEFAULT_BP_SYSTOLIC, 80.0)
-    hr = heart_rate if heart_rate > 0 else _DEFAULT_HEART_RATE
-    temp = temperature if temperature > 0 else _DEFAULT_TEMPERATURE
+    # ── 0. Validate mandatory vital signs ──────────────────────────────
+    missing: list[str] = []
+    if not bp.strip():
+        missing.append("Blood Pressure")
+    if heart_rate <= 0:
+        missing.append("Heart Rate")
+    if temperature <= 0:
+        missing.append("Temperature")
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Mandatory clinical data missing: {', '.join(missing)}.",
+        )
 
-    # ── 1. Extract optional uploaded report ────────────────────────────
+    bp_systolic, bp_diastolic = _parse_bp(bp)
+    hr = heart_rate
+    temp = temperature
+
+    # ── 1. Process optional uploaded document ───────────────────────
     report_text = ""
+    doc_extraction: dict | None = None
     if file is not None:
         raw = await file.read()
-        report_text = raw.decode("utf-8", errors="replace")
+        filename = file.filename or ""
+        content_type = file.content_type or ""
+
+        if is_pdf(filename):
+            # Extract text from PDF, then use Gemini to parse clinical data
+            pdf_text = extract_text_from_pdf(raw)
+            if pdf_text:
+                report_text = pdf_text
+                doc_extraction = await analyze_document_text(pdf_text)
+            else:
+                logger.warning("PDF had no extractable text -- skipping document analysis")
+        elif is_image(filename):
+            # Pass image bytes directly to Gemini Vision (multimodal)
+            mime = content_type if content_type.startswith("image/") else "image/png"
+            doc_extraction = await analyze_document_image(raw, mime)
+            report_text = doc_extraction.get("document_summary", "")
+        else:
+            # Fallback: try to decode as UTF-8 text
+            report_text = raw.decode("utf-8", errors="replace")
+
+    # ── 1b. Merge document-extracted data with form inputs ─────────
+    if doc_extraction:
+        extracted_symptoms = doc_extraction.get("extracted_symptoms", "")
+        if extracted_symptoms:
+            symptoms = f"{symptoms}. Document findings: {extracted_symptoms}"
+
+        extracted_conditions = doc_extraction.get("extracted_conditions", "")
+        if extracted_conditions and not conditions:
+            conditions = extracted_conditions
+
+        vitals = doc_extraction.get("extracted_vitals", {})
+        if vitals.get("bp") and not bp.strip():
+            bp_systolic, bp_diastolic = _parse_bp(vitals["bp"])
+        if vitals.get("heart_rate") and hr == _DEFAULT_HEART_RATE:
+            try:
+                hr = float(vitals["heart_rate"])
+            except ValueError:
+                pass
+        if vitals.get("temperature") and temp == _DEFAULT_TEMPERATURE:
+            try:
+                temp = float(vitals["temperature"])
+            except ValueError:
+                pass
 
     # ── 2. ML inference (with fallback) ────────────────────────────────
     ml_result = await _run_ml(age, gender, symptoms, bp_systolic, hr, temp)
@@ -126,6 +218,7 @@ async def analyze(
             age=age,
             gender=gender,
             symptoms=symptoms,
+            conditions=conditions if conditions else "None reported",
             bp_systolic=bp_systolic,
             bp_diastolic=bp_diastolic,
             heart_rate=hr,
@@ -142,6 +235,8 @@ async def analyze(
     else:
         # Pure Gemini fallback -- no ML prediction available
         fallback_text = f"Symptoms: {symptoms}"
+        if conditions:
+            fallback_text += f"\nPre-existing Conditions: {conditions}"
         fallback_text += f"\nVitals: BP {bp_systolic}/{bp_diastolic}, HR {hr}, Temp {temp}"
         if report_text:
             fallback_text += f"\n\nAttached Report:\n{report_text}"
@@ -161,7 +256,7 @@ async def analyze(
         else None
     )
 
-    return {
+    response = {
         "ml_prediction": ml_prediction,
         "ai_explanation": gemini_response,
         "final_recommendation": {
@@ -175,4 +270,39 @@ async def analyze(
             "recommended_action": gemini_response.get("recommended_action", ""),
             "urgency_score": gemini_response.get("urgency_score", 5),
         },
+        "risk_factors": gemini_response.get("risk_factors", []),
+        "vital_analysis": gemini_response.get("vital_analysis", []),
+        "dept_insights": gemini_response.get("dept_insights", {}),
+        "care_plan": gemini_response.get("care_plan", {
+            "care_instructions": [],
+            "dietary_recommendations": [],
+            "dietary_restrictions": [],
+        }),
+        "confidence_score": gemini_response.get("confidence_score", 50),
     }
+
+    # ── 5. Persist to Firestore ──────────────────────────────────────
+    if uid:
+        try:
+            rec = response["final_recommendation"]
+            symptom_list = [s.strip() for s in symptoms.split(",") if s.strip()]
+            condition_list = [c.strip() for c in conditions.split(",") if c.strip()]
+
+            firestore_db.collection("users").document(uid).collection("history").add({
+                "timestamp": SERVER_TIMESTAMP,
+                "symptoms": symptom_list,
+                "conditions": condition_list,
+                "risk_level": rec["risk_level"],
+                "department": rec["department"],
+                "summary": rec["summary"],
+                "recommended_action": rec["recommended_action"],
+                "urgency_score": rec["urgency_score"],
+                "confidence_score": response["confidence_score"],
+                "ml_prediction": ml_prediction,
+                "fileName": file.filename if file else None,
+            })
+            logger.info("Saved triage result to Firestore for uid=%s", uid)
+        except Exception:
+            logger.exception("Failed to save triage result to Firestore for uid=%s", uid)
+
+    return response

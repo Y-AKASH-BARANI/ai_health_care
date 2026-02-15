@@ -3,6 +3,7 @@ import type { TriageResult } from "@/store/userStore";
 const API_BASE = "http://127.0.0.1:8000";
 
 interface AnalyzeParams {
+  uid: string;
   age: string;
   gender: string;
   symptoms: string[];
@@ -14,6 +15,7 @@ interface AnalyzeParams {
 }
 
 export async function analyzePatient({
+  uid,
   age,
   gender,
   symptoms,
@@ -24,12 +26,11 @@ export async function analyzePatient({
   file,
 }: AnalyzeParams): Promise<TriageResult> {
   const formData = new FormData();
+  formData.append("uid", uid || "");
   formData.append("age", age || "0");
   formData.append("gender", gender || "Unknown");
-  formData.append(
-    "symptoms",
-    `Symptoms: ${symptoms.join(", ")}. Pre-existing conditions: ${conditions.join(", ")}.`
-  );
+  formData.append("symptoms", symptoms.join(", "));
+  formData.append("conditions", conditions.join(", "));
   if (bp) {
     formData.append("bp", bp);
   }
@@ -51,6 +52,24 @@ export async function analyzePatient({
   if (!res.ok) {
     const err = await res.json().catch(() => null);
     throw new Error(err?.detail || `Request failed with status ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function sendChatMessage(
+  uid: string,
+  message: string,
+): Promise<{ reply: string }> {
+  const res = await fetch(`${API_BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uid, message }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail || `Chat request failed with status ${res.status}`);
   }
 
   return res.json();

@@ -1,54 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Loader2,
-  AlertTriangle,
-  Stethoscope,
-  ShieldCheck,
-  Brain,
-  CheckCircle2,
-} from "lucide-react";
+import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { useUserStore } from "@/store/userStore";
 import { analyzePatient } from "@/lib/api";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import FileUpload from "@/components/triage/FileUpload";
 import SymptomSelect from "@/components/triage/SymptomSelect";
 import ConditionSelect from "@/components/triage/ConditionSelect";
-
-const RISK_STYLES: Record<string, { badge: string; icon: string }> = {
-  Low: {
-    badge: "border-green-500/30 bg-green-500/10 text-green-400",
-    icon: "text-green-400",
-  },
-  Moderate: {
-    badge: "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
-    icon: "text-yellow-400",
-  },
-  Medium: {
-    badge: "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
-    icon: "text-yellow-400",
-  },
-  High: {
-    badge: "border-red-500/30 bg-red-500/10 text-red-400",
-    icon: "text-red-400",
-  },
-  Critical: {
-    badge: "border-red-600/40 bg-red-600/20 text-red-300",
-    icon: "text-red-300",
-  },
-};
-
-function getRiskStyle(level: string) {
-  return (
-    RISK_STYLES[level] ?? {
-      badge: "border-zinc-600 bg-zinc-800 text-zinc-300",
-      icon: "text-zinc-400",
-    }
-  );
-}
 
 export default function Triage() {
   const router = useRouter();
@@ -64,9 +24,15 @@ export default function Triage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const vitalsComplete = bp.trim() !== "" && heartRate.trim() !== "" && temperature.trim() !== "";
+
   async function handleSubmit() {
-    if (symptoms.length === 0) {
-      setError("Please select at least one symptom.");
+    if (symptoms.length === 0 && !file) {
+      setError("Please select at least one symptom or upload a medical report.");
+      return;
+    }
+    if (!vitalsComplete) {
+      setError("Blood Pressure, Heart Rate, and Temperature are required.");
       return;
     }
 
@@ -75,6 +41,7 @@ export default function Triage() {
 
     try {
       const data = await analyzePatient({
+        uid,
         age,
         gender,
         symptoms,
@@ -87,30 +54,12 @@ export default function Triage() {
 
       setTriageResult(data);
       router.push("/result");
-
-      // Save to Firestore
-      if (uid) {
-        await addDoc(collection(db, "users", uid, "history"), {
-          timestamp: serverTimestamp(),
-          symptoms,
-          conditions,
-          risk_level: data.final_recommendation.risk_level,
-          department: data.final_recommendation.department,
-          explanation: data.final_recommendation.summary,
-          fileName: file?.name || null,
-        });
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
   }
-
-  const rec = triageResult?.final_recommendation;
-  const ml = triageResult?.ml_prediction;
-  const ai = triageResult?.ai_explanation;
-  const riskStyle = rec ? getRiskStyle(rec.risk_level) : null;
 
   return (
     <div className="flex flex-col items-center px-4 py-12">
@@ -145,7 +94,7 @@ export default function Triage() {
           <div className="mb-6">
             <h3 className="mb-3 text-sm font-medium text-zinc-300">
               Vital Signs{" "}
-              <span className="text-zinc-500">(optional)</span>
+              <span className="text-red-400">*Required</span>
             </h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
@@ -153,7 +102,7 @@ export default function Triage() {
                   htmlFor="bp"
                   className="mb-1 block text-xs text-zinc-500"
                 >
-                  Blood Pressure
+                  Blood Pressure <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="bp"
@@ -169,7 +118,7 @@ export default function Triage() {
                   htmlFor="heartRate"
                   className="mb-1 block text-xs text-zinc-500"
                 >
-                  Heart Rate (bpm)
+                  Heart Rate (bpm) <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="heartRate"
@@ -185,7 +134,7 @@ export default function Triage() {
                   htmlFor="temperature"
                   className="mb-1 block text-xs text-zinc-500"
                 >
-                  Temperature (°C)
+                  Temperature (°C) <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="temperature"
@@ -209,7 +158,7 @@ export default function Triage() {
 
           <button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || !vitalsComplete}
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-40"
           >
             {loading ? (
@@ -222,140 +171,6 @@ export default function Triage() {
             )}
           </button>
         </div>
-
-        {/* Results */}
-        <AnimatePresence>
-          {triageResult && rec && riskStyle && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.4 }}
-              className="mt-8 flex flex-col gap-4"
-            >
-              {/* Risk + Department header card */}
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 backdrop-blur-xl">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  {/* Risk badge */}
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className={`h-6 w-6 ${riskStyle.icon}`} />
-                    <span
-                      className={`rounded-full border px-4 py-1 text-sm font-bold ${riskStyle.badge}`}
-                    >
-                      {rec.risk_level} Risk
-                    </span>
-                    {rec.urgency_score != null && (
-                      <span className="text-xs text-zinc-500">
-                        Urgency {rec.urgency_score}/10
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Department */}
-                  <div className="flex items-center gap-2">
-                    <Stethoscope className="h-4 w-4 text-blue-400" />
-                    <span className="text-sm font-semibold text-white">
-                      {rec.department}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Summary */}
-                {rec.summary && (
-                  <p className="mt-4 text-sm leading-relaxed text-zinc-300">
-                    {rec.summary}
-                  </p>
-                )}
-              </div>
-
-              {/* ML Prediction card */}
-              {ml && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 backdrop-blur-xl">
-                  <div className="mb-3 flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-purple-400" />
-                    <h3 className="text-sm font-semibold text-zinc-300">
-                      ML Model Prediction
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-lg border border-zinc-800 bg-black/40 p-3">
-                      <p className="text-xs text-zinc-500">Risk Level</p>
-                      <p className="text-sm font-medium text-white">
-                        {ml.risk_level}
-                      </p>
-                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-zinc-800">
-                        <div
-                          className="h-1.5 rounded-full bg-purple-500"
-                          style={{
-                            width: `${(ml.risk_confidence * 100).toFixed(0)}%`,
-                          }}
-                        />
-                      </div>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {(ml.risk_confidence * 100).toFixed(1)}% confidence
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-zinc-800 bg-black/40 p-3">
-                      <p className="text-xs text-zinc-500">Department</p>
-                      <p className="text-sm font-medium text-white">
-                        {ml.department}
-                      </p>
-                      <div className="mt-1.5 h-1.5 w-full rounded-full bg-zinc-800">
-                        <div
-                          className="h-1.5 rounded-full bg-blue-500"
-                          style={{
-                            width: `${(ml.department_confidence * 100).toFixed(0)}%`,
-                          }}
-                        />
-                      </div>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {(ml.department_confidence * 100).toFixed(1)}% confidence
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* AI Explanation card */}
-              {ai && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 backdrop-blur-xl">
-                  <div className="mb-3 flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                    <h3 className="text-sm font-semibold text-zinc-300">
-                      AI Explanation
-                    </h3>
-                  </div>
-
-                  {/* Key Findings */}
-                  {ai.key_findings && ai.key_findings.length > 0 && (
-                    <ul className="mb-4 flex flex-col gap-1.5">
-                      {ai.key_findings.map((finding, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                          <span className="text-sm text-zinc-300">
-                            {finding}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {/* Recommended Action */}
-                  {rec.recommended_action && (
-                    <div className="rounded-lg border border-zinc-800 bg-black/40 p-4">
-                      <p className="mb-1 text-xs font-medium text-zinc-500">
-                        Recommended Action
-                      </p>
-                      <p className="text-sm leading-relaxed text-white">
-                        {rec.recommended_action}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
     </div>
   );
