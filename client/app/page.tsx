@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Chrome, ShieldCheck, Activity } from "lucide-react";
-import { signInWithGoogle } from "@/lib/firebase";
+import { signInWithGoogle, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { useUserStore } from "@/store/userStore";
 import { useState, useEffect } from "react";
 
@@ -17,6 +18,7 @@ const ROTATING_KEYWORDS = [
 export default function Home() {
   const router = useRouter();
   const setUser = useUserStore((s) => s.setUser);
+  const setDemographics = useUserStore((s) => s.setDemographics);
   const [loading, setLoading] = useState(false);
   const [keywordIndex, setKeywordIndex] = useState(0);
 
@@ -31,12 +33,28 @@ export default function Home() {
     try {
       setLoading(true);
       const user = await signInWithGoogle();
+
       setUser({
         displayName: user.displayName ?? "",
         email: user.email ?? "",
         photoURL: user.photoURL ?? "",
         uid: user.uid,
       });
+
+      // Check for existing demographics in Firestore
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        if (data.age && data.gender) {
+          // If demographics exist, restore them and go to dashboard
+          setDemographics({ age: data.age, gender: data.gender });
+          router.push("/dashboard");
+          return;
+        }
+      }
+
       router.push("/onboarding");
     } catch (error) {
       console.error("Sign-in failed:", error);

@@ -2,10 +2,8 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 
 from app.ai_engine.gemini import analyze_document_image, analyze_document_text, analyze_report
-from app.firebase_setup import firestore_db
 from ml_core.inference import predictor
 from utils.text_processing import extract_text_from_pdf, is_image, is_pdf
 
@@ -137,7 +135,6 @@ async def analyze(
     heart_rate: float = Form(0),
     temperature: float = Form(0),
     file: UploadFile | None = File(None),
-    uid: str = Form(""),
 ):
     # ── 0. Validate mandatory vital signs ──────────────────────────────
     missing: list[str] = []
@@ -280,29 +277,5 @@ async def analyze(
         }),
         "confidence_score": gemini_response.get("confidence_score", 50),
     }
-
-    # ── 5. Persist to Firestore ──────────────────────────────────────
-    if uid:
-        try:
-            rec = response["final_recommendation"]
-            symptom_list = [s.strip() for s in symptoms.split(",") if s.strip()]
-            condition_list = [c.strip() for c in conditions.split(",") if c.strip()]
-
-            firestore_db.collection("users").document(uid).collection("history").add({
-                "timestamp": SERVER_TIMESTAMP,
-                "symptoms": symptom_list,
-                "conditions": condition_list,
-                "risk_level": rec["risk_level"],
-                "department": rec["department"],
-                "summary": rec["summary"],
-                "recommended_action": rec["recommended_action"],
-                "urgency_score": rec["urgency_score"],
-                "confidence_score": response["confidence_score"],
-                "ml_prediction": ml_prediction,
-                "fileName": file.filename if file else None,
-            })
-            logger.info("Saved triage result to Firestore for uid=%s", uid)
-        except Exception:
-            logger.exception("Failed to save triage result to Firestore for uid=%s", uid)
 
     return response

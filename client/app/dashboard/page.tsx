@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useUserStore } from "@/store/userStore";
 import { db } from "@/lib/firebase";
 import {
   collection,
+  doc,
   query,
   orderBy,
   onSnapshot,
@@ -50,8 +52,33 @@ function getRiskDot(level: string) {
 }
 
 export default function DashboardPage() {
-  const { displayName, photoURL, age, gender, uid } = useUserStore();
+  const router = useRouter();
+  const { displayName, photoURL, age, gender, uid, sessionCount, setSessionCount } = useUserStore();
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  useEffect(() => {
+    if (!uid) {
+      router.push("/");
+    }
+  }, [uid, router]);
+
+  // Real-time listener on user document for sessionCount
+  useEffect(() => {
+    if (!uid) return;
+
+    const unsubscribe = onSnapshot(doc(db, "users", uid), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (typeof data.sessionCount === "number") {
+          setSessionCount(data.sessionCount);
+        }
+      }
+    }, (error) => {
+      console.warn("User doc listener error:", error.message);
+    });
+
+    return () => unsubscribe();
+  }, [uid, setSessionCount]);
 
   useEffect(() => {
     if (!uid) {
@@ -70,6 +97,8 @@ export default function DashboardPage() {
         ...doc.data(),
       })) as HistoryEntry[];
       setHistory(entries);
+    }, (error) => {
+      console.warn("History listener error:", error.message);
     });
 
     return () => unsubscribe();
@@ -77,8 +106,10 @@ export default function DashboardPage() {
 
   const currentRisk = history[0]?.risk_level ?? "Low";
   const lastDate = history[0]?.timestamp
-    ? history[0].timestamp.toDate().toLocaleDateString()
+    ? history[0].timestamp.toDate().toLocaleDateString("en-US")
     : "No sessions yet";
+
+  if (!uid) return null;
 
   return (
     <div className="flex flex-1 flex-col lg:flex-row">
@@ -91,7 +122,7 @@ export default function DashboardPage() {
           gender={gender}
           riskLevel={currentRisk}
           lastTriageDate={lastDate}
-          totalSessions={history.length}
+          totalSessions={sessionCount > 0 ? sessionCount : history.length}
         />
       </aside>
 

@@ -12,6 +12,8 @@ import {
   orderBy,
   onSnapshot,
   Timestamp,
+  doc,
+  setDoc,
 } from "firebase/firestore";
 
 interface HistoryEntry {
@@ -60,6 +62,8 @@ export default function UserProfile() {
         ...doc.data(),
       })) as HistoryEntry[];
       setHistory(entries);
+    }, (error) => {
+      console.warn("Profile history listener error:", error.message);
     });
 
     return () => unsubscribe();
@@ -73,6 +77,13 @@ export default function UserProfile() {
 
   function handleSave() {
     updateDemographics(editAge, editGender);
+    if (uid) {
+      setDoc(
+        doc(db, "users", uid),
+        { age: editAge, gender: editGender },
+        { merge: true }
+      ).catch((err) => console.error("Failed to save demographics:", err));
+    }
   }
 
   async function handleLogout() {
@@ -228,7 +239,7 @@ export default function UserProfile() {
                             </span>
                             <span className="ml-auto text-[10px] text-zinc-500">
                               {entry.timestamp
-                                ? entry.timestamp.toDate().toLocaleDateString()
+                                ? entry.timestamp.toDate().toLocaleDateString("en-US")
                                 : ""}
                             </span>
                           </div>

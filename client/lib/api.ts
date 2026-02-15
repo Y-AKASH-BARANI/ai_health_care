@@ -3,7 +3,6 @@ import type { TriageResult } from "@/store/userStore";
 const API_BASE = "http://127.0.0.1:8000";
 
 interface AnalyzeParams {
-  uid: string;
   age: string;
   gender: string;
   symptoms: string[];
@@ -15,7 +14,6 @@ interface AnalyzeParams {
 }
 
 export async function analyzePatient({
-  uid,
   age,
   gender,
   symptoms,
@@ -26,7 +24,6 @@ export async function analyzePatient({
   file,
 }: AnalyzeParams): Promise<TriageResult> {
   const formData = new FormData();
-  formData.append("uid", uid || "");
   formData.append("age", age || "0");
   formData.append("gender", gender || "Unknown");
   formData.append("symptoms", symptoms.join(", "));

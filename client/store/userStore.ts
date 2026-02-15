@@ -67,6 +67,7 @@ interface UserState {
   uid: string;
   age: string;
   gender: string;
+  sessionCount: number;
   triageResult: TriageResult | null;
   medicalHistory: MedicalFile[];
   setUser: (user: {
@@ -76,6 +77,7 @@ interface UserState {
     uid: string;
   }) => void;
   setDemographics: (demographics: { age: string; gender: string }) => void;
+  setSessionCount: (count: number) => void;
   setTriageResult: (result: TriageResult) => void;
   addMedicalFile: (file: { fileName: string }) => void;
   removeMedicalFile: (id: string) => void;
@@ -90,6 +92,7 @@ export const useUserStore = create<UserState>((set) => ({
   uid: "",
   age: "",
   gender: "",
+  sessionCount: 0,
   triageResult: null,
   medicalHistory: [],
   setUser: (user) =>
@@ -104,6 +107,7 @@ export const useUserStore = create<UserState>((set) => ({
       age: demographics.age,
       gender: demographics.gender,
     }),
+  setSessionCount: (count) => set({ sessionCount: count }),
   setTriageResult: (result) => set({ triageResult: result }),
   addMedicalFile: (file) =>
     set((state) => ({
@@ -112,7 +116,7 @@ export const useUserStore = create<UserState>((set) => ({
         {
           id: crypto.randomUUID(),
           fileName: file.fileName,
-          uploadDate: new Date().toLocaleDateString(),
+          uploadDate: new Date().toLocaleDateString("en-US"),
         },
       ],
     })),
@@ -129,6 +133,7 @@ export const useUserStore = create<UserState>((set) => ({
       uid: "",
       age: "",
       gender: "",
+      sessionCount: 0,
       triageResult: null,
       medicalHistory: [],
     }),

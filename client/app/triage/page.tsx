@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useUserStore } from "@/store/userStore";
 import { analyzePatient } from "@/lib/api";
+import { db } from "@/lib/firebase";
+import { collection, doc, addDoc, setDoc, serverTimestamp, increment } from "firebase/firestore";
 import FileUpload from "@/components/triage/FileUpload";
 import SymptomSelect from "@/components/triage/SymptomSelect";
 import ConditionSelect from "@/components/triage/ConditionSelect";
@@ -41,7 +43,6 @@ export default function Triage() {
 
     try {
       const data = await analyzePatient({
-        uid,
         age,
         gender,
         symptoms,
@@ -51,6 +52,32 @@ export default function Triage() {
         temperature,
         file,
       });
+
+      // Save session to Firestore via client SDK so the local cache
+      // is updated immediately and onSnapshot listeners pick it up.
+      if (uid) {
+        const rec = data.final_recommendation;
+        await addDoc(collection(db, "users", uid, "history"), {
+          timestamp: serverTimestamp(),
+          symptoms,
+          conditions,
+          risk_level: rec.risk_level,
+          department: rec.department,
+          summary: rec.summary,
+          recommended_action: rec.recommended_action,
+          urgency_score: rec.urgency_score,
+          confidence_score: data.confidence_score,
+          ml_prediction: data.ml_prediction,
+          fileName: file?.name ?? null,
+        });
+
+        // Increment session count on user document
+        await setDoc(doc(db, "users", uid), {
+          sessionCount: increment(1),
+          lastTriageDate: serverTimestamp(),
+          lastRiskLevel: rec.risk_level,
+        }, { merge: true });
+      }
 
       setTriageResult(data);
       router.push("/result");

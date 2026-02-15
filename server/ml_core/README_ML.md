@@ -47,7 +47,20 @@ This will:
 4. Print evaluation metrics to stdout.
 5. Save artifacts to `server/models/` (`*.pkl` files).
 
-## 3. Run Inference (programmatic)
+## 3. Evaluate Model Performance
+
+To get a detailed evaluation report on the test set:
+
+```bash
+python -m ml_core.evaluate_model
+```
+
+This will load the saved models and the dataset, recreate the test split (ensuring no data leakage), and print:
+- Accuracy, Precision, Recall, F1 Score
+- Detailed Classification Report per class
+- Confusion Matrix
+
+## 4. Run Inference (programmatic)
 
 ```python
 from ml_core.inference import TriagePredictor

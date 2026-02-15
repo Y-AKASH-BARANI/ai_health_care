@@ -1,6 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
+import { useUserStore } from "@/store/userStore";
 
 interface UserHealthCardProps {
     displayName: string;
@@ -34,6 +38,17 @@ export default function UserHealthCard({
     totalSessions = 0,
 }: UserHealthCardProps) {
     const router = useRouter();
+    const { clearUser } = useUserStore();
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            clearUser();
+            router.push("/");
+        } catch (error) {
+            console.error("Logout error:", error);
+        }
+    };
 
     const initials = displayName
         ? displayName
@@ -74,6 +89,14 @@ export default function UserHealthCard({
                         {gender && <span className="capitalize">{gender}</span>}
                     </p>
                 )}
+
+                <button
+                    onClick={handleLogout}
+                    className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-zinc-800/50 px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors border border-zinc-700/30"
+                >
+                    <LogOut size={14} />
+                    <span>Sign Out</span>
+                </button>
             </div>
 
             {/* ── Divider ── */}

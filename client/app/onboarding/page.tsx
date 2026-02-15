@@ -4,11 +4,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useUserStore } from "@/store/userStore";
 
 export default function Onboarding() {
   const router = useRouter();
   const displayName = useUserStore((s) => s.displayName);
+  const uid = useUserStore((s) => s.uid);
   const setDemographics = useUserStore((s) => s.setDemographics);
 
   const [age, setAge] = useState("");
@@ -18,6 +21,14 @@ export default function Onboarding() {
     e.preventDefault();
     if (!age || !gender) return;
     setDemographics({ age, gender });
+
+    // Persist demographics to Firestore so they survive page refresh
+    if (uid) {
+      setDoc(doc(db, "users", uid), { age, gender }, { merge: true }).catch(
+        (err) => console.error("Failed to save demographics:", err)
+      );
+    }
+
     router.push("/dashboard");
   }
 

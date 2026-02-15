@@ -20,7 +20,7 @@ if not _groq_key:
 
 groq_client = Groq(api_key=_groq_key) if _groq_key else None
 
-_MODEL = "llama3-8b-8192"
+_MODEL = "llama-3.1-8b-instant"
 
 # ---------------------------------------------------------------------------
 # Request / Response
