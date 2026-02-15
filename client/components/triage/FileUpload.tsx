@@ -8,6 +8,7 @@ interface FileUploadProps {
   file: File | null;
   onFileChange: (file: File | null) => void;
   onError: (message: string) => void;
+  className?: string;
 }
 
 const ACCEPTED_TYPES = [
@@ -22,6 +23,7 @@ export default function FileUpload({
   file,
   onFileChange,
   onError,
+  className = "",
 }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addMedicalFile = useUserStore((s) => s.addMedicalFile);
@@ -41,7 +43,7 @@ export default function FileUpload({
   return (
     <div
       onClick={() => fileInputRef.current?.click()}
-      className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-zinc-700 px-6 py-6 transition-colors hover:border-blue-500"
+      className={`flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-zinc-700 px-6 py-6 transition-colors hover:border-blue-500 ${className}`}
     >
       <Upload className="h-8 w-8 text-zinc-500" />
       {file ? (

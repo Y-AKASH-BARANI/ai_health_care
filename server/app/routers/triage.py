@@ -11,19 +11,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# ---------------------------------------------------------------------------
-# The ML predictor singleton is imported from ml_core.inference.
-# Models are lazy-loaded on first predict() call.
-# ---------------------------------------------------------------------------
-
-# Default vital signs used when the form does not provide values.
 _DEFAULT_BP_SYSTOLIC: float = 120.0
 _DEFAULT_HEART_RATE: float = 80.0
 _DEFAULT_TEMPERATURE: float = 37.0
 
-# ---------------------------------------------------------------------------
-# Hybrid prompt sent to Gemini *after* the ML model has made its prediction.
-# ---------------------------------------------------------------------------
 _HYBRID_PROMPT = """You are an AI medical triage assistant.
 
 Patient Demographics:
@@ -136,7 +127,7 @@ async def analyze(
     temperature: float = Form(0),
     file: UploadFile | None = File(None),
 ):
-    # ── 0. Validate mandatory vital signs ──────────────────────────────
+
     missing: list[str] = []
     if not bp.strip():
         missing.append("Blood Pressure")
@@ -154,7 +145,7 @@ async def analyze(
     hr = heart_rate
     temp = temperature
 
-    # ── 1. Process optional uploaded document ───────────────────────
+
     report_text = ""
     doc_extraction: dict | None = None
     if file is not None:
@@ -163,7 +154,7 @@ async def analyze(
         content_type = file.content_type or ""
 
         if is_pdf(filename):
-            # Extract text from PDF, then use Gemini to parse clinical data
+
             pdf_text = extract_text_from_pdf(raw)
             if pdf_text:
                 report_text = pdf_text
@@ -171,15 +162,11 @@ async def analyze(
             else:
                 logger.warning("PDF had no extractable text -- skipping document analysis")
         elif is_image(filename):
-            # Pass image bytes directly to Gemini Vision (multimodal)
             mime = content_type if content_type.startswith("image/") else "image/png"
             doc_extraction = await analyze_document_image(raw, mime)
             report_text = doc_extraction.get("document_summary", "")
         else:
-            # Fallback: try to decode as UTF-8 text
             report_text = raw.decode("utf-8", errors="replace")
-
-    # ── 1b. Merge document-extracted data with form inputs ─────────
     if doc_extraction:
         extracted_symptoms = doc_extraction.get("extracted_symptoms", "")
         if extracted_symptoms:
@@ -203,10 +190,8 @@ async def analyze(
             except ValueError:
                 pass
 
-    # ── 2. ML inference (with fallback) ────────────────────────────────
     ml_result = await _run_ml(age, gender, symptoms, bp_systolic, hr, temp)
 
-    # ── 3. LLM contextualisation via Gemini ────────────────────────────
     if ml_result is not None:
         report_section = (
             f"Attached Report:\n{report_text}" if report_text else "No report attached."
@@ -230,7 +215,6 @@ async def analyze(
             report_text=hybrid_prompt, age=str(age), gender=gender,
         )
     else:
-        # Pure Gemini fallback -- no ML prediction available
         fallback_text = f"Symptoms: {symptoms}"
         if conditions:
             fallback_text += f"\nPre-existing Conditions: {conditions}"
@@ -241,7 +225,6 @@ async def analyze(
             report_text=fallback_text, age=str(age), gender=gender,
         )
 
-    # ── 4. Build response ──────────────────────────────────────────────
     ml_prediction = (
         {
             "risk_level": ml_result["risk_level"],

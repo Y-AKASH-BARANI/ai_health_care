@@ -89,7 +89,7 @@ export default function Triage() {
   }
 
   return (
-    <div className="flex flex-col items-center px-4 py-12">
+    <div className="flex flex-col items-center px-4 py-12 no-scrollbar">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -117,67 +117,81 @@ export default function Triage() {
             <ConditionSelect selected={conditions} onChange={setConditions} />
           </div>
 
-          {/* Vital Signs */}
-          <div className="mb-6">
-            <h3 className="mb-3 text-sm font-medium text-zinc-300">
-              Vital Signs{" "}
-              <span className="text-red-400">*Required</span>
-            </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <label
-                  htmlFor="bp"
-                  className="mb-1 block text-xs text-zinc-500"
-                >
-                  Blood Pressure <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="bp"
-                  type="text"
-                  placeholder="e.g., 120/80"
-                  value={bp}
-                  onChange={(e) => setBp(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+          {/* Layout: Vitals (Left) + File Upload (Right) */}
+          <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+            {/* Vital Signs */}
+            <div>
+              <h3 className="mb-3 text-sm font-medium text-zinc-300">
+                Vital Signs <span className="text-red-400">*Required</span>
+              </h3>
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label
+                    htmlFor="bp"
+                    className="mb-1 block text-xs text-zinc-500"
+                  >
+                    Blood Pressure <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    id="bp"
+                    type="text"
+                    placeholder="e.g., 120/80"
+                    value={bp}
+                    onChange={(e) => setBp(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="heartRate"
+                    className="mb-1 block text-xs text-zinc-500"
+                  >
+                    Heart Rate (bpm) <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    id="heartRate"
+                    type="number"
+                    placeholder="e.g., 72"
+                    value={heartRate}
+                    onChange={(e) => setHeartRate(e.target.value)}
+                    className="no-spin-button w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="temperature"
+                    className="mb-1 block text-xs text-zinc-500"
+                  >
+                    Temperature (°C) <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    id="temperature"
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 37.0"
+                    value={temperature}
+                    onChange={(e) => setTemperature(e.target.value)}
+                    className="no-spin-button w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label
-                  htmlFor="heartRate"
-                  className="mb-1 block text-xs text-zinc-500"
-                >
-                  Heart Rate (bpm) <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="heartRate"
-                  type="number"
-                  placeholder="e.g., 72"
-                  value={heartRate}
-                  onChange={(e) => setHeartRate(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="temperature"
-                  className="mb-1 block text-xs text-zinc-500"
-                >
-                  Temperature (°C) <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="temperature"
-                  type="number"
-                  step="0.1"
-                  placeholder="e.g., 37.0"
-                  value={temperature}
-                  onChange={(e) => setTemperature(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            </div>
+
+            {/* File Upload (Optional) */}
+            <div className="flex flex-col">
+              <h3 className="mb-3 text-sm font-medium text-zinc-300">
+                Medical Report <span className="text-zinc-500 text-xs">(Optional)</span>
+              </h3>
+              <div className="h-full">
+                <FileUpload
+                  file={file}
+                  onFileChange={setFile}
+                  onError={setError}
+                  className="h-full justify-center"
                 />
               </div>
             </div>
           </div>
-
-          {/* File Upload (Optional) */}
-          <FileUpload file={file} onFileChange={setFile} onError={setError} />
 
           {error && (
             <p className="mt-4 text-center text-sm text-red-400">{error}</p>
