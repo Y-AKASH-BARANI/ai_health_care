@@ -63,7 +63,7 @@ export default function Home() {
   }
 
   return (
-    <div className="relative flex flex-1 overflow-hidden">
+    <main className="relative flex flex-1 overflow-hidden">
       {/* ── Background Orbs ── */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full bg-emerald-600/10 blur-[160px]" />
@@ -221,6 +221,6 @@ export default function Home() {
           </div>
         </motion.div>
       </div>
-    </div>
+    </main>
   );
 }

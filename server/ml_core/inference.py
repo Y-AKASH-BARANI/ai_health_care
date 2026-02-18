@@ -137,16 +137,13 @@ class TriagePredictor:
         if not self.ready:
             self.load_models()
 
-        # Build a single-row DataFrame so the ColumnTransformer inside
-        # each Pipeline receives the same structure it was trained on.
         df = pd.DataFrame([input_data])
 
-        # --- Risk prediction ------------------------------------------------
+
         risk_pred = self._risk_pipeline.predict(df)[0]
         risk_proba = self._risk_pipeline.predict_proba(df)[0]
         risk_conf = float(np.max(risk_proba))
 
-        # --- Department prediction -------------------------------------------
         dept_pred = self._dept_pipeline.predict(df)[0]
         dept_proba = self._dept_pipeline.predict_proba(df)[0]
         dept_conf = float(np.max(dept_proba))
@@ -159,14 +156,10 @@ class TriagePredictor:
         }
 
 
-# ---------------------------------------------------------------------------
-# Module-level singleton -- import this directly in the router / app layer.
-# Models are lazy-loaded on first predict() call.
-# ---------------------------------------------------------------------------
+
 predictor = TriagePredictor()
 
 
-# ── Quick smoke test ──────────────────────────────────────────────────────
 if __name__ == "__main__":
     sample = {
         "age": 62,

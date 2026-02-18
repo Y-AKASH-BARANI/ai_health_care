@@ -111,7 +111,6 @@ class TrainingPipeline:
             ]
         )
 
-    # ── Data Loading ───────────────────────────────────────────────────
     def load_data(self, csv_path: Optional[str] = None) -> pd.DataFrame:
         """Load the triage dataset from a CSV file.
 
@@ -166,7 +165,7 @@ class TrainingPipeline:
         )
         return X_train, X_test, y_risk_train, y_risk_test, y_dept_train, y_dept_test
 
-    # ── Training ───────────────────────────────────────────────────────
+
     def train_risk_model(self, X_train: pd.DataFrame, y_train: pd.Series) -> Pipeline:
         """Train the patient risk-level classifier pipeline."""
         self._risk_pipeline = self._build_pipeline(self.seed)
@@ -179,7 +178,6 @@ class TrainingPipeline:
         self._dept_pipeline.fit(X_train, y_train)
         return self._dept_pipeline
 
-    # ── Evaluation ─────────────────────────────────────────────────────
     @staticmethod
     def evaluate(pipeline: Pipeline, X_test: pd.DataFrame, y_test: pd.Series, label: str) -> dict:
         """Compute and print classification metrics.
